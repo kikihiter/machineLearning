@@ -1,0 +1,320 @@
+https://blog.csdn.net/qq_37171771/article/details/79335892
+
+博客
+学院
+下载
+图文课
+TinyMind
+论坛
+APP
+问答
+商城
+VIP会员
+活动
+招聘
+ITeye
+GitChat
+
+搜博主文章
+写博客
+发Chat
+传资源
+登录注册
+原
+NLP学习记录——序列标注
+2018年02月18日 22:39:04 阅读数：559 标签： NLP 机器学习  更多
+个人分类： NLP 机器学习
+tagging problem
+即序列标注问题。 
+给定一个词序列作为输入：the dog saw a cat。 
+要求输出其词性序列：D N V D N （D for a determiner, N for noun, and V for verb）。 
+有时输出序列会是这种形式：the/D dog/N saw/V a/D cat/N。 
+其中有两个重要具体分支任务：part-of-speech(POS) tagging和named-entity recognition.
+
+POS tagging
+INPUT: 
+Profits soared at Boeing Co., easily topping forecasts on Wall Street, as their CEO Alan Mulally announced first quarter results. 
+OUTPUT: 
+Profits/N soared/V at/P Boeing/N Co./N ,/, easily/ADV topping/V forecasts/N on/P Wall/N Street/N ,/, as/P their/POSS CEO/N Alan/N Mulally/N announced/V first/ADJ quarter/N results/N ./. 
+KEY: 
+N = Noun 
+V = Verb 
+P = Preposition 
+Adv = Adverb 
+Adj = Adjective 
+… 
+pos tagging是NLP领域的基础问题之一，在很多领域发挥着重要作用。 
+pos tagging的一个难点在于歧义——许多单词可以是不同的pos。上例中的profits是名词，但是在其它地方可能是动词。想到高中政治中学到“人是社会中的人”，同样，“单词是语句中的单词”，单纯从单词本身出发去解决问题是很难的，而考虑上下文后会更容易一些，能够削弱歧义的影响。 
+另一个难点在于很多单词出现的频率很低，导致比较难训练。这一点在词向量这一概念出现之后就不再是很严重的问题了，因为就算很多单词很少出现，但是其词向量会跟近义词接近。
+
+named entity recognition
+例： 
+INPUT: Profits soared at Boeing Co., easily topping forecasts on Wall Street, as their CEO Alan Mulally announced first quarter results. 
+OUTPUT: Profits soared at [Company Boeing Co.], easily topping forecasts on [Location Wall Street], as their CEO [Person Alan Mulally] announced first quarter results. 
+该任务就是要从语句中找出命名实体来，如人名、地名、公司名等。 
+实际上，在处理此类任务时，通常会对每一个单词预测一个label： 
+INPUT: Profits soared at Boeing Co., easily topping forecasts on Wall Street, as their CEO Alan Mulally announced first quarter results. 
+OUTPUT: Profits/NA soared/NA at/NA Boeing/SC Co./CC ,/NA easily/NA topping/NA forecasts/NA on/NA Wall/SL Street/CL ,/NA as/NA their/NA CEO/NA Alan/SP Mulally/CP announced/NA first/NA quarter/NA results/NA ./NA 
+KEY: 
+NA = No entity 
+SC = Start Company 
+CC = Continue Company 
+SL = Start Location 
+CL = Continue Location 
+… 
+然后对这个半成品输出进行整理就可以得到完整的命名实体。
+
+generative model
+接下来要介绍利用监督学习处理pos tagging的方法，具体为隐马尔可夫模型，在此之前先来介绍生成模型。 
+给定训练集：(x1,y1)…(xm,ym)，每一个训练集包括输入x和标注y，我们的任务是寻找一个函数f，使得对于给定的输入x得到尽可能准确的输出y——y=f(x)。 
+基于条件概率的判别模型： 
+这里写图片描述 
+而生成模型是基于联合概率p(x,y)的，并且我们常常会分解联合概率： 
+p(x,y)=p(y)p(x|y) 
+然后分别对p(y)和p(x|y)进行估计。这样做只是因为求解过程通常会比较便利。 
+应用贝叶斯公式，有： 
+这里写图片描述 
+于是 
+这里写图片描述 
+这个过程就是，先以概率p(y)选择某种输出y，然后在概率分布p(x|y)上生成x。 
+然后让我们把生成模型应用到tagging上。 
+假定有限词库V和所有可能tag的集合K，由V中单词组成输入序列x1,x2…xn，由V中单词和对应的K中tag组成输出序列y1,y2…yn，两个序列组成一个序列对，定义所有的序列对的集合为S，那么，generative tagging model即为： 
+1.对于S中所有的序列对： 
+这里写图片描述 
+2.这里写图片描述 
+3.这里写图片描述 
+可以看到，generative tagging model实际上就是落在S上的一个概率分布，下面介绍求解这个分布的一种方法。
+
+Trigram Hidden Markov Models
+首先定义两个参数： 
+q(s|u,v)：在观测到tags u,v之后，下一个tag是s的概率。 
+e(x|s)：观测到tag s后，对应位置的输入是x的概率。 
+则有： 
+这里写图片描述 
+其中y(n+1)=STOP，y0=y(-1)=*。这就是trigram HMM模型。 
+例如，输入序列为”the dog laughs”，输出tag序列为”D N V STOP”，则： 
+这里写图片描述 
+其中四个q的乘积即为观测到输出序列为”D N V STOP”的概率，即为p(y)。 
+三个e的乘积为输出序列为”D N V STOP”时，输入序列为”the dog laughs”的概率，即为p(x|y)。 
+那么，以上模型是怎么来的呢？ 
+我们将模型的核心问题写成： 
+这里写图片描述 
+首先， 
+这里写图片描述 
+对于前一项。与语言模型中的trigram类似，假设某位置的Y只与前两个Y有关： 
+这里写图片描述 
+再做一个假设，某位置的X只与序列位置对应的Y有关，则有： 
+这里写图片描述 
+与语言模型中的概率计算方法类似，依然采取频率估计概率的方法。 
+在训练集中，定义c(u,v)为tag序列u v出现的次数，c(u,v,s)为tag序列u v s出现的次数，c(s)为tag s出现的次数，c(s>x)为tag s 与单词x配对的次数，那么： 
+这里写图片描述 
+具体计算过程中还可以利用一些平滑方法提高准确率。 
+最后还有一个问题是如何求得 
+这里写图片描述 
+课上讲了一种算法叫做Viterbi Algorithm，个人认为没有必要细究，跳过。
+
+named entity recognition using nerual natwork
+以下为cs224n assignment3内容。 
+首先考虑基于基于窗口预测的NER： 
+这里写图片描述 
+设置窗口大小为w，即选取预测中心词加上上下各w个单词的窗口作为输入，输出为命名实体标识。上例中w=1 
+这是一个很简单的任务，可直接使用一个简单神经网络去做，并使用cross entropy损失函数： 
+这里写图片描述 
+也可以使用RNN来做NER： 
+这里写图片描述 
+每一时刻的输出都是该时刻输入的命名实体标识。 
+若同样使用cross entropy损失函数： 
+这里写图片描述 
+这里写图片描述 
+为改善性能，还可以更新cell，换为GRU或者LSTM。 
+emmmm。。。显然，用神经网络做要无脑得多。。
+
+成为大数据工程师，80%的程序员选择了这条路！
+大数据技术与运用的成熟，应用集中于互联网、金融、医疗、新能源、通信和房地产等行业。整理平均薪资情况和大数据学习大纲供查看
+
+想对作者说点什么？ 我来说一句
+CRF序列标注模型几个问题的理解
+liu_zhlai
+ 7862
+
+1,CRF
+
+双向LSTM NLP序列标注
+u014692971
+ 1311
+
+Bidirectional LSTM-CRF Models for Sequence Tagging  原论文下载地址：https://arxiv.org/pdf/1508.01991v1 论...
+
+自然语言处理之文本标注问题
+gzmfxy
+ 870
+
+文本标注 (tagging) 是一个监督学习问题，可以认为标注问题是分类问题的一个推广，标注问题又是更复杂的结构预测 (structure prediction) 问题的简单形式，标注问题的输入是一个...
+
+TensorFlow入门（六） 双端 LSTM 实现序列标注（分词）
+Jerr__y
+ 2.8万
+
+@author: huangyongye @creat_date: 2017-04-19 reference: - [1] 【中文分词系列】 4. 基于双向LSTM的seq2seq字标注 ...
+
+HMM与序列标注
+zbc1090549839
+ 3378
+
+隐马尔可夫模型（Hidden Markov Model，HMM）是统计模型，它用来描述一个含有隐含未知参数(隐状态)的马尔可夫过程。其难点是从可观察的参数中(显状态)确定该过程的隐含参数(隐状态)，然...
+
+结构学习：序列标注
+dugudaibo
+ 1386
+
+以序列标注为背景，介绍了隐马尔科夫模型，条件随机场模型
+
+NLP+VS︱深度学习数据集标注工具、图像语料数据库、实..._CSDN博客
+8-26
+
+~~因为不太会使用opencv、matlab工具,所以在找一些比较简单的工具。 . . 一、NLP标注工具 来源:《构想:中文文本标注工具(附开源文本标注工具列表)》 Chinese-...
+
+双向LSTM NLP序列标注 - CSDN博客
+8-28
+
+使用双向LSTM+CRFs 模型用于NLP序列标注问题(POS、分块、命名实体识别)。作者认为应该是这个模型首次用于该研究领域。模型两个优点,精度高和对词向量的依赖性小 (...
+
+TensorFlow 使用例子-LSTM实现序列标注
+omnispace
+ 6512
+
+本文主要改写了一下"Sequence Tagging with Tensorflow"程序。原文是基于英文的命名实体识别(named entity recognition)问题，由于博主找不到相应的中...
+
+序列标注中的BIO标注介绍
+HappyRocking
+ 2537
+
+一、序列标注      序列标注（Sequence labeling）是我们在解决NLP问题时经常遇到的基本问题之一。在序列标注中，我们想对一个序列的每一个元素标注一个标签。一般来说，一个序列指的是一...
+
+序列标注中的几种标签方案
+liangjiubujiu
+ 723
+
+标签说明标签方案中通常都使用一些简短的英文字符[串]来编码。标签是打在token上的。对于英文，token可以是一个单词（e.g. awesome），也可以是一个字符（e.g. a）。对于中文，tok...
+
+序列标注问题的解决方法_RNN
+hlang8160
+ 336
+
+序列标注问题应该说是自然语言处理中最常见的问题，而且很可能是最而没有之一。在深度学习没有广泛渗透到各个应用领域之前，传统的最常用的解决序列标注问题的方案是最大熵、CRF等模型，尤其是CRF，基本是最主...
+
+相关热词 nlp算法nlp nlp世界排名 nlp书 nlp大赛 nlp数据收集
+数据集标注工具 - CSDN博客
+8-24
+
+在我们学习深度学习的时候,经常阅读大牛的论文,并从网上下载对应的数据集和代码,在自己运行网络并调节网路结构或者超参数中理解网络的运作。 但是我们始终无法接触到...
+
+机器学习——数据标注工具使用 - CSDN博客
+7-16
+
+LabelImg源码编译教程 LabelImg_github Windows_Linux打包软件使用方法Steps Click ‘Change default saved annotation folder’ in Menu/File Click ‘Open Dir’ ...
+
+深度学习在NLP中的应用 - CSDN博客
+8-22
+
+    文本分类这个在NLP领域是一个很普通而应用很广的课题,而且已经有了...深度学习图片分类方法 深度学习 目标标注 深度学习算法类别 多智能体深度学习 深度...
+
+介绍| 深度学习数据集标注工具 - CSDN博客
+6-6
+
+一、NLP标注工具BRAT BRAT是一个基于web的文本标注工具,主要用于对文本的结构化标注,用BRAT生成的标注结果能够把无结构化的原始文本结构化,供计算机处理。利用该工具...
+
+【NLP】计算所汉语词性标记集 - CSDN博客
+8-5
+
+1.       有助于提高汉语词法分析器的切分和标注正确率;2.  ...NLP 2篇 Algorithm && DataStructures 6篇 Kubernetes 10篇 Docker 11篇 ...
+
+谷歌新发布了一个精确标注动作的数据集,堪称ImageNet视..._CSDN博客
+6-7
+
+这就使得建立一个优质的动作标注视频数据集非常不.... . 一、NLP标注工具BRAT BRAT是一个基于web的...
+
+个人资料
+
+浪漫主义AI
+
+关注
+原创
+6
+粉丝
+2
+喜欢
+0
+评论
+1
+等级： 访问： 4459 积分： 100 排名： 145万+
+最新文章
+机器阅读理解技术初探&Bi-DAF
+美团深度学习平台初体验&推荐
+神经网络文本分类技术实践总结
+NLP学习记录——句法分析
+NLP学习记录：语言模型
+个人分类
+NLP 4篇
+机器学习 4篇
+深度学习 3篇
+云服务 1篇
+机器阅读理解 1篇
+归档
+2018年3月 3篇
+2018年2月 3篇
+热门文章
+NLP学习记录——句法分析
+阅读量：2476
+
+NLP学习记录——序列标注
+阅读量：556
+
+美团深度学习平台初体验&推荐
+阅读量：443
+
+机器阅读理解技术初探&Bi-DAF
+阅读量：403
+
+神经网络文本分类技术实践总结
+阅读量：192
+
+最新评论
+NLP学习记录——句法分析
+Q_S_Y_Q：博主你好，transition-based dependency parser这个的参考论文可以发...
+
+联系我们
+客服
+请扫描二维码联系客服
+webmaster@csdn.net
+
+400-660-0108
+
+QQ客服 客服论坛
+
+关于招聘广告服务 网站地图
+
+©2018 CSDN版权所有 京ICP证09002463号
+
+百度提供搜索支持
+
+经营性网站备案信息
+
+网络110报警服务
+
+中国互联网举报中心
+
+北京互联网违法和不良信息举报中心
+
+
+登录
+注册
+
+
+0
+
+ 
+
+
+ 
+
